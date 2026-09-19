@@ -12,6 +12,7 @@ from sendrin.generated.models.send_otp_response import SendOtpResponse
 from sendrin.generated.models.verify_otp_request import VerifyOtpRequest
 from sendrin.generated.models.verify_otp_request_channel import VerifyOtpRequestChannel
 from sendrin.generated.models.verify_otp_response import VerifyOtpResponse
+from sendrin.generated.types import UNSET
 
 
 class Sendrin:
@@ -113,6 +114,17 @@ class _OtpNamespace:
         code: str | None = None,
         **kwargs: Any,
     ) -> SendOtpResponse:
+        # `code_length`/`ttl_seconds` carry server-side defaults. The generated
+        # SendOtpRequest dataclass bakes the OpenAPI spec's documented default
+        # values (6, 600) directly into its own field defaults rather than
+        # UNSET, so leaving them out of this call would silently still send
+        # those literal values. Default them to UNSET here instead so, unless
+        # a caller explicitly passes one, the field is omitted from the
+        # request body entirely and the server applies its own current
+        # default — this is what keeps the SDK from drifting out of sync if
+        # that server-side default ever changes without a client regen.
+        kwargs.setdefault("code_length", UNSET)
+        kwargs.setdefault("ttl_seconds", UNSET)
         request = SendOtpRequest(
             channel=SendOtpRequestChannel(channel),
             recipient_email=recipient_email,

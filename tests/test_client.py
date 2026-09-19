@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 from sendrin.client import Sendrin
@@ -35,6 +37,68 @@ def test_otp_send_success_reaches_right_path_with_auth_header():
     assert request.headers["Authorization"] == "Bearer gns_live_sk_test"
     assert result.otp_id == "otp_123"
     assert result.remaining_credits == 42
+
+
+def test_otp_send_omits_code_length_and_ttl_seconds_when_not_passed():
+    """Unless the caller explicitly passes code_length/ttl_seconds, they must
+    be omitted from the request body entirely so the server applies its own
+    (possibly-changing) defaults, rather than the SDK silently freezing them
+    at whatever value the OpenAPI spec declared at generation time."""
+    captured: dict[str, httpx.Request] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["request"] = request
+        return httpx.Response(
+            200,
+            json={
+                "otp_id": "otp_123",
+                "channel": "sms",
+                "expires_at": "2026-09-19T12:00:00+00:00",
+                "ttl_seconds": 600,
+                "purpose": "login",
+                "remaining_credits": 42,
+                "status": "sent",
+            },
+        )
+
+    client = _sendrin(handler)
+    client.otp.send(channel="sms", recipient_phone="+14155552671", purpose="login")
+
+    body = json.loads(captured["request"].content)
+    assert "code_length" not in body
+    assert "ttl_seconds" not in body
+
+
+def test_otp_send_includes_code_length_and_ttl_seconds_when_explicitly_passed():
+    captured: dict[str, httpx.Request] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["request"] = request
+        return httpx.Response(
+            200,
+            json={
+                "otp_id": "otp_123",
+                "channel": "sms",
+                "expires_at": "2026-09-19T12:00:00+00:00",
+                "ttl_seconds": 120,
+                "purpose": "login",
+                "remaining_credits": 42,
+                "status": "sent",
+            },
+        )
+
+    client = _sendrin(handler)
+    client.otp.send(
+        channel="sms",
+        recipient_phone="+14155552671",
+        purpose="login",
+        code_length=8,
+        ttl_seconds=120,
+    )
+
+    body = json.loads(captured["request"].content)
+    assert body["code_length"] == 8
+    assert body["ttl_seconds"] == 120
 
 
 def test_otp_send_429_raises_quota_exceeded_without_retry():

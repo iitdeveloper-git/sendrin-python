@@ -49,5 +49,10 @@ def verify_webhook(
         secret.encode(), f"{timestamp}.".encode() + body, hashlib.sha256
     ).hexdigest()
 
-    if not hmac.compare_digest(provided_sig, expected_sig):
+    # Compare as bytes, not str: hmac.compare_digest raises TypeError when
+    # given two `str` arguments and either contains non-ASCII characters.
+    # `signature` comes straight from an untrusted request header, so a
+    # malformed/malicious header must not escape as a raw TypeError — only
+    # WebhookVerificationError is documented as raised by this function.
+    if not hmac.compare_digest(provided_sig.encode(), expected_sig.encode()):
         raise WebhookVerificationError("Signature mismatch")

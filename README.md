@@ -2,33 +2,132 @@
 
 Official Python SDK for the Sendrin notification API.
 
-## Status
+## Install
 
-This package currently ships the low-level HTTP client generated directly from
-Sendrin's OpenAPI spec (`apps/docs/content/openapi.json`). A hand-written
-ergonomics layer (`sendrin.client.Sendrin`, webhook signature verification,
-etc.) lands in a follow-up change; for now, import the generated client
-directly:
-
-```python
-from sendrin.generated import Client
-
-client = Client(base_url="https://api.sendrin.com")
+```bash
+pip install sendrin
 ```
 
-Authenticated requests use `AuthenticatedClient`, also exported from
-`sendrin.generated`:
+## Quickstart
+
+```python
+from sendrin import Sendrin
+
+client = Sendrin(api_key="gns_live_sk_9d8f7e6a5b4c3d2e1f0a")
+
+sent = client.otp.send(
+    channel="sms",
+    recipient_phone="+14155552671",
+    purpose="login",
+)
+print("Sent:", sent.otp_id)
+
+# Prompt your user for the code they received, then verify it.
+result = client.otp.verify(
+    channel="sms",
+    code="123456",
+    recipient_phone="+14155552671",
+    purpose="login",
+)
+print("Verified:", result.verified)
+```
+
+## The `Sendrin` client
+
+```python
+from sendrin import Sendrin
+
+client = Sendrin(
+    api_key="gns_live_sk_...",           # required
+    base_url="https://api.sendrin.com",  # default shown
+    timeout_seconds=10.0,                # default shown
+    max_retries=2,                       # default shown
+    transport=None,                      # optional httpx.BaseTransport, e.g. for tests
+)
+```
+
+- `api_key` — your Sendrin application secret key. Sent as `Authorization: Bearer <api_key>`.
+- `base_url` — override to point at a different environment.
+- `timeout_seconds` — per-request timeout passed to the underlying `httpx.Client`.
+- `max_retries` — number of retries for network errors and `5xx` responses, with
+  exponential backoff (0.5s, 1s, 2s, ...). `429` responses are never retried —
+  they raise `SendrinQuotaExceededError` immediately, since retrying a quota
+  error immediately just burns another request against the same quota.
+- `transport` — an optional `httpx.BaseTransport` (e.g. `httpx.MockTransport`),
+  primarily useful for tests.
+
+`Sendrin` can be used as a context manager (`with Sendrin(...) as client:`) or
+closed explicitly with `client.close()`.
+
+### OTP
+
+```python
+client.otp.send(
+    channel="sms",  # or "email"
+    recipient_phone="+14155552671",
+    recipient_email=None,
+    purpose="login",
+    code=None,  # supply your own code instead of letting Sendrin generate one
+)
+
+client.otp.verify(
+    channel="sms",
+    code="123456",
+    recipient_phone="+14155552671",
+    recipient_email=None,
+    purpose="login",
+)
+```
+
+Both methods accept any additional generated request fields (e.g.
+`code_length`, `ttl_seconds`, `brand_name`, `application_id`,
+`support_email`) as keyword arguments. Fields you don't pass are left unset
+so the server applies its own defaults.
+
+Errors raise `SendrinAPIError` (with `.status_code` and `.error_code`) or its
+subclass `SendrinQuotaExceededError` for `429` responses.
+
+## Webhook signature verification
+
+```python
+from sendrin import WebhookVerificationError, verify_webhook
+
+try:
+    verify_webhook(
+        body=raw_request_body,       # bytes — see warning below
+        timestamp=request.headers["X-GNS-Timestamp"],
+        signature=request.headers["X-GNS-Signature"],
+        secret="whsec_...",
+        tolerance_seconds=300,       # default shown
+    )
+except WebhookVerificationError:
+    # reject the webhook
+    ...
+```
+
+> [!WARNING]
+> `body` **must** be the raw request body bytes exactly as received — do not
+> `json.loads` and re-serialize it before calling `verify_webhook`. Sendrin
+> signs the exact bytes it transmits; re-serializing risks a whitespace or
+> key-order mismatch that would make even a genuine, untampered webhook fail
+> verification.
+
+`verify_webhook` raises `WebhookVerificationError` if the signature is
+invalid, the signature format is unrecognized, or the timestamp is outside
+`tolerance_seconds` of the current time (replay-attack protection). It never
+raises any other exception type for malformed/malicious input.
+
+## Low-level generated client
+
+`sendrin.otp` and the webhook helpers cover the common cases. For endpoints
+not yet wrapped by the ergonomics layer, the generated client (from
+Sendrin's OpenAPI spec) is available directly under `sendrin.generated`:
 
 ```python
 from sendrin.generated import AuthenticatedClient
+from sendrin.generated.api.otp import send_otp_api_v1_otp_send_post
 
 client = AuthenticatedClient(base_url="https://api.sendrin.com", token="<api-key>")
-```
-
-Endpoint functions live under `sendrin.generated.api.<tag>.<operation>`, e.g.:
-
-```python
-from sendrin.generated.api.otp import send_otp_api_v1_otp_send_post
 ```
 
 ## Development

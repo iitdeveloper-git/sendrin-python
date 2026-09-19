@@ -56,6 +56,20 @@ def test_verify_webhook_rejects_stale_timestamp():
         verify_webhook(body=body, timestamp=old_timestamp, signature=signature, secret=secret)
 
 
+def test_verify_webhook_non_ascii_signature_raises_verification_error_not_type_error():
+    """hmac.compare_digest raises TypeError when comparing two `str` values
+    where one contains non-ASCII characters. `signature` comes straight from
+    an untrusted request header, so a malformed/malicious header must surface
+    as the documented WebhookVerificationError, never a raw TypeError."""
+    secret = "whsec_test_12345"  # noqa: S105 -- test fixture value, not a secret
+    body = b'{"event":"notification.delivered","id":"ntf_abc"}'
+    timestamp = str(int(time.time()))
+    signature = "v1=" + "ü" * 64
+
+    with pytest.raises(WebhookVerificationError):
+        verify_webhook(body=body, timestamp=timestamp, signature=signature, secret=secret)
+
+
 def test_verify_webhook_does_not_reserialize_json():
     """The critical correctness case from this plan's Spec section: verification
     must work against raw bytes with non-canonical formatting (extra whitespace,
