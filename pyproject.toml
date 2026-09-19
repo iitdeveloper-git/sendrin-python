@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sendrin"
+version = "0.1.0"
+description = "Official Python SDK for the Sendrin notification API"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+dependencies = [
+  "httpx>=0.23,<1",
+  "attrs>=22.2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "mypy>=1.14,<2", "ruff>=0.9,<1"]
+
+[project.urls]
+Homepage = "https://sendrin.com"
+Documentation = "https://docs.sendrin.com"
+Repository = "https://github.com/iitdeveloper-git/sendrin"
