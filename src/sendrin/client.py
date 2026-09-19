@@ -30,6 +30,17 @@ class Sendrin:
         max_retries: int = 2,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
+        """Initialize a new Sendrin API client instance.
+
+        Args:
+            api_key: The Sendrin secret API key (e.g. `gns_live_sk_...`) used to authenticate requests.
+            base_url: The root URL of the Sendrin API server. Defaults to `https://api.sendrin.com`.
+            timeout_seconds: Maximum time in seconds to wait for HTTP responses. Defaults to 10.0.
+            max_retries: Number of retry attempts for network errors and transient 5xx server responses.
+                Defaults to 2.
+            transport: Optional custom HTTP transport (e.g. `httpx.MockTransport` or proxy transport)
+                for testing or specialized networking.
+        """
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = timeout_seconds
@@ -76,12 +87,15 @@ class Sendrin:
         raise SendrinAPIError(f"Request failed after {self._max_retries} retries") from last_exc
 
     def close(self) -> None:
+        """Close the underlying HTTP client session and release network connection pools."""
         self._http.close()
 
     def __enter__(self) -> Sendrin:
+        """Enter the runtime context for the Sendrin client."""
         return self
 
     def __exit__(self, *exc_info: object) -> None:
+        """Exit the runtime context and ensure client connection resources are closed."""
         self.close()
 
 
@@ -114,6 +128,24 @@ class _OtpNamespace:
         code: str | None = None,
         **kwargs: Any,
     ) -> SendOtpResponse:
+        """Dispatch a one-time passcode (OTP) to a recipient via SMS, Email, or WhatsApp.
+
+        Args:
+            channel: Delivery channel for the OTP ('sms', 'email', or 'whatsapp').
+            recipient_phone: Recipient's phone number in E.164 format (required for 'sms' and 'whatsapp').
+            recipient_email: Recipient's email address (required for 'email').
+            purpose: Context identifier for the code (e.g. 'login', 'signup', 'password_reset').
+                Defaults to 'login'.
+            code: Optional custom code to dispatch. If omitted, Sendrin securely generates a random code.
+            **kwargs: Additional parameters passed to the API (e.g. `code_length`, `ttl_seconds`, `brand_name`).
+
+        Returns:
+            SendOtpResponse: Server response containing dispatch status, session metadata, and validity window.
+
+        Raises:
+            SendrinQuotaExceededError: If the account has exhausted its notification credits (HTTP 429).
+            SendrinAPIError: If validation fails or the server returns an error.
+        """
         # `code_length`/`ttl_seconds` carry server-side defaults. The generated
         # SendOtpRequest dataclass bakes the OpenAPI spec's documented default
         # values (6, 600) directly into its own field defaults rather than
@@ -145,6 +177,22 @@ class _OtpNamespace:
         purpose: str = "login",
         **kwargs: Any,
     ) -> VerifyOtpResponse:
+        """Verify an OTP code submitted by an end-user.
+
+        Args:
+            channel: Delivery channel used when the code was sent ('sms', 'email', or 'whatsapp').
+            code: The OTP code string entered by the user.
+            recipient_phone: The recipient's phone number (required if channel was 'sms' or 'whatsapp').
+            recipient_email: The recipient's email address (required if channel was 'email').
+            purpose: The context identifier matching the initial dispatch (default: 'login').
+            **kwargs: Additional parameters passed to the verification endpoint.
+
+        Returns:
+            VerifyOtpResponse: Result object containing `verified` (bool) and verification token.
+
+        Raises:
+            SendrinAPIError: If the code is invalid, expired, or locked due to brute-force attempts.
+        """
         request = VerifyOtpRequest(
             code=code,
             channel=VerifyOtpRequestChannel(channel),
