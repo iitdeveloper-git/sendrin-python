@@ -38,11 +38,11 @@ print("Verified:", result.verified)
 from sendrin import Sendrin
 
 client = Sendrin(
-    api_key="gns_live_sk_...",           # required
+    api_key="gns_live_sk_...",  # required
     base_url="https://api.sendrin.com",  # default shown
-    timeout_seconds=10.0,                # default shown
-    max_retries=2,                       # default shown
-    transport=None,                      # optional httpx.BaseTransport, e.g. for tests
+    timeout_seconds=10.0,  # default shown
+    max_retries=2,  # default shown
+    transport=None,  # optional httpx.BaseTransport, e.g. for tests
 )
 ```
 
@@ -94,11 +94,11 @@ from sendrin import WebhookVerificationError, verify_webhook
 
 try:
     verify_webhook(
-        body=raw_request_body,       # bytes — see warning below
+        body=raw_request_body,  # bytes — see warning below
         timestamp=request.headers["X-GNS-Timestamp"],
         signature=request.headers["X-GNS-Signature"],
         secret="whsec_...",
-        tolerance_seconds=300,       # default shown
+        tolerance_seconds=300,  # default shown
     )
 except WebhookVerificationError:
     # reject the webhook
