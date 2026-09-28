@@ -20,4 +20,7 @@ dev = ["pytest>=8,<10", "mypy>=1.14,<2", "ruff>=0.9,<1"]
 [project.urls]
 Homepage = "https://sendrin.com"
 Documentation = "https://docs.sendrin.com"
-Repository = "https://github.com/iitdeveloper-git/sendrin"
+Repository = "https://github.com/iitdeveloper-git/sendrin-python.git"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
